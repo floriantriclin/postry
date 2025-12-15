@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
+    "@supabase/supabase-js": "^2.87.1",
     "flag-icons": "^7.5.0",
     "lucide-react": "^0.561.0",
     "next": "16.0.10",

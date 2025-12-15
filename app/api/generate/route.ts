@@ -1,26 +1,38 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js"; // 1. Import Supabase
 
+// Init Gemini
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || "");
+
+// 2. Init Supabase (Côté Serveur)
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY!
+);
 
 export async function POST(request: Request) {
   try {
-    // On récupère TOUS tes nouveaux paramètres
+    // On récupère tout le corps de la requête dans une variable 'body'
+    const body = await request.json();
+    
     const { 
       topic, 
-      type,       // Analyse, Introspection...
-      goal,       // Notoriété, Vente...
-      speaker,    // Je, Nous, Neutre
-      audience,   // Tu, Vous, Personne
-      gender,     // Homme, Femme, Neutre
-      language,   // FR, EN, ES...
-      tone,       // Expert, Empathique...
-      length      // Court, Moyen, Long
-    } = await request.json();
+      type,       
+      goal,       
+      speaker,    
+      audience,   
+      gender,     
+      language,   
+      tone,       
+      length,
+      userId // <--- 3. On récupère l'ID utilisateur
+    } = body;
 
+    // Utilisation de 2.5-flash (le plus stable et rapide actuellement)
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
-    // --- CONSTRUCTION DES INSTRUCTIONS GRAMMATICALES ---
+    // --- CONSTRUCTION DES INSTRUCTIONS GRAMMATICALES (Ton code d'origine) ---
     
     // 1. Qui parle ? (Speaker + Genre)
     let speakerInstruction = "";
@@ -67,7 +79,7 @@ export async function POST(request: Request) {
       - ${contextInstruction}
       
       RÈGLES D'OR DE RÉDACTION :
-      1. Commence par une accroche (Hook) percutante de moins de 15 mots.
+      1. Commence par une accroche (Hook) percutante de moins de 20 mots.
       2. Saute une ligne après l'accroche.
       3. Utilise des paragraphes courts et aérés.
       4. Inclus des émojis pertinents (mais pas trop).
@@ -77,9 +89,25 @@ export async function POST(request: Request) {
       Génère uniquement le contenu du post.
     `;
 
+    // --- GÉNÉRATION ---
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
+
+    // --- 4. SAUVEGARDE DANS SUPABASE ---
+    if (userId) {
+      const { error } = await supabase.from('posts').insert({
+        user_id: userId,
+        topic: topic,
+        content: text,
+        parameters: body // On sauvegarde tous tes réglages (ton, langue, etc.) en JSON
+      });
+      
+      if (error) {
+        console.error("Erreur sauvegarde Supabase:", error);
+        // On ne bloque pas l'utilisateur si la sauvegarde échoue, on loggue juste l'erreur
+      }
+    }
 
     return NextResponse.json({ output: text });
 

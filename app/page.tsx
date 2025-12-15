@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import { ArrowRight, ArrowLeft, Check, Sparkles, PenTool } from "lucide-react";
+import { useState, useEffect } from "react";
+import { ArrowRight, ArrowLeft, Check, Sparkles, PenTool, Lock, Eye, EyeOff } from "lucide-react"; // Ajout des icônes de sécurité
 import "flag-icons/css/flag-icons.min.css"; // <--- 1. IMPORT DES DRAPEAUX
+import { supabase } from "@/lib/supabase"; // Ajout de la connexion Supabase
 
 // --- TYPES DE DONNÉES ---
 type FormData = {
@@ -33,6 +34,18 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [generatedPost, setGeneratedPost] = useState("");
 
+// --- ÉTATS D'AUTHENTIFICATION (AJOUTS) ---
+  const [session, setSession] = useState<any>(null);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+
+  // États du formulaire de connexion
+  const [authMode, setAuthMode] = useState<'signup' | 'signin'>('signup');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState("");
+
   const [formData, setFormData] = useState<FormData>({
     topic: "",
     language: "fr",
@@ -44,6 +57,67 @@ export default function Home() {
     tone: "pédagogue",
     length: "moyen",
   });
+
+// --- 1. GESTION DE SESSION (AJOUT) ---
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // --- 2. LOGIQUE AUTHENTIFICATION (AJOUT) ---
+  const handleAuth = async () => {
+    if (!email || !password) return setAuthError("Veuillez remplir tous les champs.");
+    if (password.length < 6) return setAuthError("Le mot de passe doit faire 6 caractères min.");
+    
+    setAuthLoading(true);
+    setAuthError("");
+
+    try {
+      if (authMode === 'signup') {
+        // Inscription
+        const { data, error } = await supabase.auth.signUp({ 
+          email, password, options: { data: { newsletter: true } }
+        });
+        if (error) throw error;
+        
+        if (data.session) {
+          setSession(data.session);
+          setShowAuthModal(false);
+          executeGeneration(data.session.user.id);
+        } else {
+          alert("Vérifiez vos emails pour confirmer l'inscription.");
+        }
+      } else {
+        // Connexion
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        setSession(data.session);
+        setShowAuthModal(false);
+        executeGeneration(data.session.user.id);
+      }
+    } catch (e: any) {
+      setAuthError(e.message === "Invalid login credentials" ? "Identifiants incorrects." : e.message);
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleGoogleAuth = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({ provider: 'google' });
+    if (error) setAuthError(error.message);
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setSession(null);
+    alert("Déconnecté avec succès.");
+  };
+
 
   const nextStep = () => {
     if (step === 4 && !formData.topic.trim()) return alert("Il faut écrire un sujet pour continuer !");
@@ -58,7 +132,16 @@ export default function Home() {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleGenerate = async () => {
+  // --- 3. LOGIQUE DE GÉNÉRATION SÉCURISÉE (MODIFIÉ) ---
+  const handleGenerateClick = () => {
+    if (session) {
+      executeGeneration(session.user.id);
+    } else {
+      setShowAuthModal(true);
+    }
+  };
+
+  const executeGeneration = async (userId: string | undefined) => {
     setIsLoading(true);
     setGeneratedPost("");
     
@@ -66,7 +149,7 @@ export default function Home() {
       const response = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({ ...formData, userId }), // Envoi de l'ID User
       });
       const data = await response.json();
       setGeneratedPost(data.output);
@@ -92,10 +175,131 @@ export default function Home() {
       <div className="mb-6 text-center">
         <h1 className="text-3xl font-extrabold text-blue-900 tracking-tight">Postry.ai</h1>
         <p className="text-gray-600 text-sm font-medium">L'Assistant LinkedIn Pro</p>
+      
+       {session ? (
+          <div className="mt-4 flex flex-col items-center gap-2 animate-in fade-in">
+      <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-1 text-xs text-green-800 font-bold">
+        Connecté : {session.user.email}
       </div>
+      
+      <div className="flex gap-4 text-sm font-medium">
+        <a href="/history" className="text-blue-600 hover:underline hover:text-blue-800">
+          📂 Voir mon historique
+        </a>
+        <span className="text-gray-300">|</span>
+        <button 
+          onClick={handleLogout}
+          className="text-red-500 hover:underline hover:text-red-700"
+        >
+          Se déconnecter
+        </button>
+      </div>
+    </div>
+  ) : (
+    <div className="mt-4 text-xs text-gray-400 italic">
+      Mode invité (Compte requis pour générer)
+    </div>
+  )}
+      
+          </div>
 
       <div className="w-full max-w-xl bg-white rounded-3xl shadow-2xl p-6 md:p-8 border border-gray-300 min-h-[500px] flex flex-col relative">
-        
+        {/* --- MODALE D'AUTHENTIFICATION (AJOUT) --- */}
+        {showAuthModal && (
+          <div className="absolute inset-0 bg-white/95 backdrop-blur-md z-50 rounded-3xl flex flex-col items-center justify-center p-6 animate-in fade-in duration-300">
+            <div className="w-full max-w-sm bg-white p-2 rounded-2xl">
+              
+              <h3 className="text-2xl font-bold text-gray-900 mb-6 text-center">
+                {authMode === 'signup' ? 'Inscription gratuite' : 'Connexion'}
+              </h3>
+
+              {authError && (
+                <div className="mb-4 p-3 bg-red-50 text-red-600 text-sm rounded-lg text-center border border-red-100">
+                  {authError}
+                </div>
+              )}
+
+              <div className="space-y-4">
+                {/* Email */}
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Email</label>
+                  <input 
+                    type="email" 
+                    className="w-full p-3 rounded-lg border border-gray-300 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-none transition-all"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                </div>
+
+                {/* Password */}
+                <div className="relative">
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="block text-sm font-bold text-gray-700">Mot de passe</label>
+                    {authMode === 'signup' && <span className="text-xs text-gray-400">Min. 6 caractères</span>}
+                  </div>
+                  <div className="relative">
+                    <input 
+                      type={showPassword ? "text" : "password"}
+                      className="w-full p-3 rounded-lg border border-gray-300 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-none transition-all pr-10"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                    />
+                    <button 
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+                    >
+                      {showPassword ? <EyeOff className="w-5 h-5"/> : <Eye className="w-5 h-5"/>}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Bouton Action */}
+                <button 
+                  onClick={handleAuth}
+                  disabled={authLoading}
+                  className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold shadow-md transition-all disabled:opacity-70"
+                >
+                  {authLoading ? 'Chargement...' : (authMode === 'signup' ? 'Créer un compte' : 'Se connecter')}
+                </button>
+
+                {/* Google Button */}
+                <div className="flex items-center gap-4 my-2">
+                  <div className="h-px bg-gray-200 flex-1"></div>
+                  <div className="w-10 h-1 bg-gray-200 rounded-full"></div>
+                  <div className="h-px bg-gray-200 flex-1"></div>
+                </div>
+                <button 
+                  onClick={handleGoogleAuth}
+                  className="w-full py-3 bg-white border border-gray-300 text-gray-700 rounded-lg font-bold hover:bg-gray-50 transition-all flex items-center justify-center gap-3"
+                >
+                  <svg className="w-5 h-5" viewBox="0 0 24 24">
+                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                  </svg>
+                  {authMode === 'signup' ? "Google" : "Google"}
+                </button>
+              </div>
+
+              <div className="mt-8 text-center text-sm">
+                {authMode === 'signup' ? (
+                  <>Déjà inscrit(e) ? <button onClick={() => setAuthMode('signin')} className="text-blue-600 font-bold hover:underline">Connexion</button></>
+                ) : (
+                  <>Pas de compte ? <button onClick={() => setAuthMode('signup')} className="text-blue-600 font-bold hover:underline">Inscription gratuite</button></>
+                )}
+              </div>
+
+              <button 
+                onClick={() => setShowAuthModal(false)}
+                className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        )}
+
         {!generatedPost ? (
           <>
             <ProgressBar />
@@ -252,12 +456,19 @@ export default function Home() {
                   </p>
                   
                   <button
-                    onClick={handleGenerate}
+                    onClick={handleGenerateClick}
                     disabled={isLoading}
                     className="w-full py-5 bg-blue-900 hover:bg-blue-800 text-white rounded-2xl font-bold text-xl shadow-xl transform hover:scale-[1.02] transition-all flex items-center justify-center gap-3 disabled:opacity-70 disabled:cursor-wait"
                   >
                     {isLoading ? "L'IA réfléchit..." : "Générer mon Post 🚀"}
                   </button>
+
+                   {/* Petit texte discret pour prévenir */}
+                  {!session && (
+                    <p className="text-xs text-gray-400 mt-4 flex items-center gap-1 justify-center">
+                      <Lock className="w-3 h-3"/> Compte gratuit requis pour voir le résultat
+                    </p>
+                  )}
                 </div>
               )}
             </div>
