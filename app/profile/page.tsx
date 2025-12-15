@@ -5,7 +5,7 @@ import { ArrowLeft, Save, Loader2, User } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 // On importe nos listes centralisées !
-import { LANGUAGES, GOALS, TONES, SPEAKERS, GENDERS, AUDIENCES } from "@/lib/config.ts";
+import { LANGUAGES, GOALS, TONES, SPEAKERS, GENDERS, AUDIENCES } from "@/lib/config";
 
 export default function ProfilePage() {
   const [session, setSession] = useState<any>(null);
