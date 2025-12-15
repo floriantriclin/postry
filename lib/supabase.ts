@@ -1,11 +1,18 @@
 import { createClient } from '@supabase/supabase-js'
 
-// Ce client est pour le Navigateur (Frontend). Il n'utilise que les clés PUBLIQUES.
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+// On récupère les variables d'environnement.
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
+// On vérifie si les variables sont bien présentes.
+// C'est la cause la plus probable de l'erreur client-side.
 if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error("Clés publiques Supabase manquantes. Vérifie .env.local");
+  // On affiche une erreur claire dans la console du navigateur (F12)
+  console.error(
+    'Supabase URL or Anon Key is missing. Check your .env.local file (for local dev) or Environment Variables on Vercel (for production).'
+  )
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+// On exporte un client Supabase initialisé.
+// S'il manque une clé, l'application plantera ici, mais l'erreur sera claire.
+export const supabase = createClient(supabaseUrl!, supabaseAnonKey!)
