@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ArrowRight, ArrowLeft, Check, Sparkles, PenTool } from "lucide-react";
+import "flag-icons/css/flag-icons.min.css"; // <--- 1. IMPORT DES DRAPEAUX
 
 // --- TYPES DE DONNÉES ---
 type FormData = {
@@ -16,24 +17,22 @@ type FormData = {
   length: string;
 };
 
-// --- LISTE DES LANGUES (Configuration) ---
+// --- 2. LISTE DES LANGUES MISE À JOUR (flag = code pays ISO) ---
 const LANGUAGES = [
-  { code: 'fr', label: '🇫🇷 Français' },
-  { code: 'en', label: '🇬🇧 English' },
-  { code: 'es', label: '🇪🇸 Español' },
-  { code: 'de', label: '🇩🇪 Deutsch' },
-  { code: 'it', label: '🇮🇹 Italiano' },
-  { code: 'pt', label: '🇵🇹 Português' },
+  { code: 'fr', flag: 'fr', label: 'Français' },
+  { code: 'en', flag: 'gb', label: 'English' }, // gb pour Great Britain
+  { code: 'es', flag: 'es', label: 'Español' },
+  { code: 'de', flag: 'de', label: 'Deutsch' },
+  { code: 'it', flag: 'it', label: 'Italiano' },
+  { code: 'pt', flag: 'pt', label: 'Português' },
 ];
 
 export default function Home() {
-  // --- ÉTAT DU WORKFLOW ---
   const [step, setStep] = useState(1);
   const totalSteps = 5;
   const [isLoading, setIsLoading] = useState(false);
   const [generatedPost, setGeneratedPost] = useState("");
 
-  // --- ÉTAT DES DONNÉES ---
   const [formData, setFormData] = useState<FormData>({
     topic: "",
     language: "fr",
@@ -46,9 +45,7 @@ export default function Home() {
     length: "moyen",
   });
 
-  // --- NAVIGATION ---
   const nextStep = () => {
-    // Validation spécifique pour l'étape du sujet (qui est maintenant l'étape 4)
     if (step === 4 && !formData.topic.trim()) return alert("Il faut écrire un sujet pour continuer !");
     if (step < totalSteps) setStep(step + 1);
   };
@@ -61,7 +58,6 @@ export default function Home() {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  // --- GÉNÉRATION ---
   const handleGenerate = async () => {
     setIsLoading(true);
     setGeneratedPost("");
@@ -81,7 +77,6 @@ export default function Home() {
     }
   };
 
-  // --- BARRE DE PROGRESSION ---
   const ProgressBar = () => (
     <div className="w-full bg-gray-200 h-2.5 rounded-full mb-8 overflow-hidden border border-gray-300">
       <div 
@@ -94,7 +89,6 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-gray-100 flex flex-col items-center justify-center p-4 font-sans text-gray-900">
       
-      {/* HEADER */}
       <div className="mb-6 text-center">
         <h1 className="text-3xl font-extrabold text-blue-900 tracking-tight">Postry.ai</h1>
         <p className="text-gray-600 text-sm font-medium">L'Assistant LinkedIn Pro</p>
@@ -108,7 +102,7 @@ export default function Home() {
 
             <div className="flex-grow">
               
-              {/* ÉTAPE 1 : CONTEXTE (Langue, Type, Objectif) */}
+              {/* ÉTAPE 1 : CONTEXTE */}
               {step === 1 && (
                 <div className="animate-in fade-in slide-in-from-right-4 duration-300">
                   <h2 className="text-2xl font-bold mb-6 text-gray-900">Commençons par les bases 🌍</h2>
@@ -119,12 +113,14 @@ export default function Home() {
                       <button
                         key={l.code}
                         onClick={() => update("language", l.code)}
-                        className={`py-3 px-4 rounded-xl border-2 font-bold text-sm transition-all
+                        className={`py-3 px-4 rounded-xl border-2 font-bold text-sm transition-all flex items-center justify-center gap-3
                           ${formData.language === l.code 
                             ? 'bg-blue-900 text-white border-blue-900 shadow-md' 
                             : 'bg-white text-gray-900 border-gray-300 hover:border-gray-400 hover:bg-gray-50'
                           }`}
                       >
+                        {/* 3. AFFICHAGE DU DRAPEAU VIA CLASS CSS */}
+                        <span className={`fi fi-${l.flag} text-lg`}></span>
                         {l.label}
                       </button>
                     ))}
@@ -144,7 +140,7 @@ export default function Home() {
                 </div>
               )}
 
-              {/* ÉTAPE 2 : IDENTITÉ (Speaker & Audience) */}
+              {/* ÉTAPE 2 : IDENTITÉ */}
               {step === 2 && (
                 <div className="animate-in fade-in slide-in-from-right-4 duration-300">
                   <h2 className="text-2xl font-bold mb-6 text-gray-900">Qui parle à qui ? 🗣️</h2>
@@ -186,7 +182,7 @@ export default function Home() {
                 </div>
               )}
 
-              {/* ÉTAPE 3 : STYLE & LONGUEUR */}
+              {/* ÉTAPE 3 : STYLE */}
               {step === 3 && (
                 <div className="animate-in fade-in slide-in-from-right-4 duration-300">
                   <h2 className="text-2xl font-bold mb-6 text-gray-900">Le style de rédaction 🎨</h2>
@@ -223,7 +219,7 @@ export default function Home() {
                 </div>
               )}
 
-              {/* ÉTAPE 4 : LE SUJET (Maintenant à la fin !) */}
+              {/* ÉTAPE 4 : SUJET */}
               {step === 4 && (
                 <div className="animate-in fade-in slide-in-from-right-4 duration-300">
                   <h2 className="text-2xl font-bold mb-4 text-gray-900">De quoi parle-t-on ? 🖊️</h2>
@@ -243,7 +239,7 @@ export default function Home() {
                 </div>
               )}
 
-               {/* ÉTAPE 5 : RÉCAP & ACTION */}
+               {/* ÉTAPE 5 : RÉCAP */}
                {step === 5 && (
                 <div className="animate-in fade-in slide-in-from-right-4 duration-300 text-center flex flex-col items-center justify-center h-full">
                   <div className="bg-blue-100 p-4 rounded-full mb-4">
@@ -266,7 +262,7 @@ export default function Home() {
               )}
             </div>
 
-            {/* BOUTONS NAVIGATION */}
+            {/* NAV */}
             <div className="flex justify-between mt-6 pt-6 border-t border-gray-200">
               <button 
                 onClick={prevStep}
@@ -287,7 +283,7 @@ export default function Home() {
             </div>
           </>
         ) : (
-          /* RÉSULTAT GÉNÉRÉ */
+          /* RESULTAT */
           <div className="animate-in zoom-in-95 duration-500 h-full flex flex-col">
             <div className="flex justify-between items-center mb-4 border-b border-gray-200 pb-4">
               <h2 className="text-xl font-extrabold text-blue-900 flex items-center gap-2">
