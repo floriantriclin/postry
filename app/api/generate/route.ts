@@ -6,7 +6,7 @@ import { createClient } from "@supabase/supabase-js"; // 1. Import Supabase
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || "");
 
 // 2. Init Supabase (Côté Serveur)
-const supabase = createClient(
+const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
@@ -96,7 +96,7 @@ export async function POST(request: Request) {
 
     // --- 4. SAUVEGARDE DANS SUPABASE ---
     if (userId) {
-      const { error } = await supabase.from('posts').insert({
+      const { error } = await supabaseAdmin.from('posts').insert({
         user_id: userId,
         topic: topic,
         content: text,
