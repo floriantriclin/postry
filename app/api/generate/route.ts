@@ -1,45 +1,86 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from "next/server";
 
-// 1. Initialisation de Google Gemini
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || "");
 
 export async function POST(request: Request) {
   try {
-    // 2. On récupère ce que l'utilisateur a envoyé depuis le Frontend
-    const { topic, tone } = await request.json();
+    // On récupère TOUS tes nouveaux paramètres
+    const { 
+      topic, 
+      type,       // Analyse, Introspection...
+      goal,       // Notoriété, Vente...
+      speaker,    // Je, Nous, Neutre
+      audience,   // Tu, Vous, Personne
+      gender,     // Homme, Femme, Neutre
+      language,   // FR, EN, ES...
+      tone,       // Expert, Empathique...
+      length      // Court, Moyen, Long
+    } = await request.json();
 
-    // 3. Choix du modèle (On utilise le plus puissant disponible : Gemini 1.5 Pro)
-    // Note : Si Gemini 3 sort via API, il suffira de changer le nom ici.
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
-    // 4. Construction du Prompt (Ta recette secrète validée)
-    // On injecte dynamiquement le sujet et le ton choisis.
+    // --- CONSTRUCTION DES INSTRUCTIONS GRAMMATICALES ---
+    
+    // 1. Qui parle ? (Speaker + Genre)
+    let speakerInstruction = "";
+    if (speaker === "je") {
+      speakerInstruction = "Rédige à la 1ère personne du singulier ('Je').";
+      if (gender === "femme") speakerInstruction += " ATTENTION : Le narrateur est une FEMME. Accorde tous les adjectifs et participes passés au féminin.";
+      if (gender === "homme") speakerInstruction += " Le narrateur est un homme.";
+    } else if (speaker === "nous") {
+      speakerInstruction = "Rédige à la 1ère personne du pluriel ('Nous').";
+    } else {
+      speakerInstruction = "Ne pas utiliser de pronoms personnels (style impersonnel/journalistique).";
+    }
+
+    // 2. À qui on parle ? (Audience)
+    let audienceInstruction = "";
+    if (audience === "tu") audienceInstruction = "Tutoye le lecteur. Crée de la proximité.";
+    if (audience === "vous") audienceInstruction = "Vouvoie le lecteur. Reste respectueux et professionnel.";
+    if (audience === "none") audienceInstruction = "Ne t'adresse jamais directement au lecteur (pas de 'vous' ni de 'tu').";
+
+    // 3. Objectif & Type
+    const contextInstruction = `Type de post : ${type}. Objectif principal : ${goal}.`;
+
+    // 4. Langue
+    const langMap: any = { 
+      "fr": "Français", "en": "Anglais", "es": "Espagnol", 
+      "de": "Allemand", "it": "Italien", "pt": "Portugais" 
+    };
+    const targetLang = langMap[language] || "Français";
+
+    // --- LE PROMPT FINAL ---
     const prompt = `
-      Ton rôle est celui d'un expert LinkedIn.
-      Tu dois rédiger un post optimisé pour la viralité.
+      Tu es un Expert Copywriter LinkedIn multilingue.
       
-      CONTEXTE :
-      - Sujet : "${topic}"
-      - Ton souhaité : "${tone}"
+      TA MISSION :
+      Rédiger un post LinkedIn en ${targetLang} sur le sujet : "${topic}".
       
-      CONTRAINTES DE RÉDACTION :
-      - Accroche (Hook) : Moins de 15 mots, percutante, doit interpeller.
-      - Longueur : Moins de 300 mots.
-      - Structure : Paragraphes courts, aérés.
-      - Style : 1ère personne du singulier ("Je").
-      - Ne t'adresse pas au lecteur directement (pas de "vous", ni de "tu") sauf si le ton est "Promotionnel".
-      - Inclus 1 à 4 émojis pertinents.
-      - Termine par 3 à 5 hashtags pertinents.
-      - Base-toi sur des connaissances générales solides et actuelles.
+      PARAMÈTRES STRUCTURELS :
+      - Longueur : ${length}
+      - Ton : ${tone}
+      
+      PARAMÈTRES D'IDENTITÉ (CRUCIAL) :
+      - ${speakerInstruction}
+      - ${audienceInstruction}
+      - ${contextInstruction}
+      
+      RÈGLES D'OR DE RÉDACTION :
+      1. Commence par une accroche (Hook) percutante de moins de 15 mots.
+      2. Saute une ligne après l'accroche.
+      3. Utilise des paragraphes courts et aérés.
+      4. Inclus des émojis pertinents (mais pas trop).
+      5. Termine par une question engageante (si pertinent avec l'objectif).
+      6. Ajoute 3 à 5 hashtags à la fin.
+      
+      Génère uniquement le contenu du post.
     `;
 
-    // 5. Envoi à l'IA
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
 
-    // 6. On renvoie le texte généré au Frontend
     return NextResponse.json({ output: text });
 
   } catch (error) {
